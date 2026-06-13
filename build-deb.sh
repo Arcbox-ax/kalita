@@ -23,11 +23,12 @@ done
 echo "[+] Copiando assets..."
 cp -r "$REPO_DIR/assets/"* "$SHARE_DIR/assets/"
 
-echo "[+] Copiando scripts de ~/scripts/ (mouse-logi)..."
-for f in mouse-logi-dialog.py mouse-logi-gui-connect.sh mouse-logi-check.sh; do
-    src="$HOME/scripts/$f"
-    [ -f "$src" ] && cp "$src" "$SHARE_DIR/scripts/" || echo "[!] $f no encontrado, saltando"
-done
+echo "[+] Copiando scripts/..."
+if [ -d "$REPO_DIR/scripts" ]; then
+    cp -r "$REPO_DIR/scripts/"* "$SHARE_DIR/scripts/"
+else
+    echo "[!] carpeta scripts/ no encontrada, saltando"
+fi
 
 chmod -R 755 "$SHARE_DIR"
 
