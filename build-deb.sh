@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="1.0.0"
+VERSION="1.0.1"
 PKG_NAME="kalita"
 ARCH="all"
 PKG_DIR="$REPO_DIR/pkg/${PKG_NAME}_${VERSION}_${ARCH}"
