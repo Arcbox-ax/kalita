@@ -1296,6 +1296,30 @@ Terminal=false
 EOF
 ok "Mouse Logi BT reconnect instalado"
 
+# ── 28. POWER-SAVER POR DEFECTO ─────────────────────────────────────────────
+inf "Configurando perfil de energía power-saver por defecto..."
+if command -v powerprofilesctl &>/dev/null; then
+  sudo tee /etc/systemd/system/power-saver-default.service > /dev/null << 'EOF'
+[Unit]
+Description=Set power profile to power-saver on boot
+After=power-profiles-daemon.service
+Requires=power-profiles-daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/powerprofilesctl set power-saver
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now power-saver-default.service 2>/dev/null || true
+  ok "power-saver activado por defecto (systemd)"
+else
+  warn "powerprofilesctl no disponible, saltando"
+fi
+
 echo ""
 echo "╔══════════════════════════════════════╗"
 echo "║   kAlita instalado correctamente!    ║"
