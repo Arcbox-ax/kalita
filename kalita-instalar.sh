@@ -891,11 +891,17 @@ chmod +x "$SCRIPTS_DIR/mouse-logi-gui-connect.sh"
 cat > "$SCRIPTS_DIR/mouse-logi-check.sh" << 'MOUSE_CHECK_EOF'
 #!/usr/bin/env bash
 # Lanzado por XFCE autostart. Espera que la sesión esté lista,
-# verifica si el mouse está conectado y abre el diálogo si no lo está.
+# enciende bluetooth, verifica si el mouse conecta y lo apaga si no.
 MOUSE_NAME="Logi M196"
 DIALOG="$HOME/scripts/mouse-logi-dialog.py"
 
-sleep 6
+sleep 8
+
+# Encender bluetooth si no está corriendo
+if ! systemctl is-active --quiet bluetooth; then
+    sudo systemctl start bluetooth
+    sleep 3
+fi
 
 is_connected() {
     local addr
@@ -904,9 +910,16 @@ is_connected() {
     bluetoothctl info "$addr" 2>/dev/null | grep -q "Connected: yes"
 }
 
-if ! is_connected; then
-    exec python3 "$DIALOG"
-fi
+# Reintentar hasta 10 veces cada 3 segundos (30s en total)
+for i in $(seq 1 10); do
+    if is_connected; then
+        exit 0
+    fi
+    sleep 3
+done
+
+# Si después de 30s sigue sin conectar, mostrar el diálogo
+exec python3 "$DIALOG"
 MOUSE_CHECK_EOF
 chmod +x "$SCRIPTS_DIR/mouse-logi-check.sh"
 
@@ -1271,9 +1284,29 @@ class MouseDialog(Gtk.Window):
             self.btn_rec.set_sensitive(True)
 
 
+def _stop_bluetooth_if_disconnected():
+    try:
+        result = subprocess.run(
+            ["bluetoothctl", "devices", "Connected"],
+            capture_output=True, text=True, timeout=5
+        )
+        if not result.stdout.strip():
+            subprocess.run(["sudo", "systemctl", "stop", "bluetooth"],
+                           capture_output=True, timeout=5)
+    except Exception:
+        pass
+
+
 def main():
+    import fcntl
+    lock_file = open("/tmp/mouse-logi-dialog.lock", "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return  # ya hay una instancia corriendo
+
     win = MouseDialog()
-    win.connect("destroy", Gtk.main_quit)
+    win.connect("destroy", lambda _: (_stop_bluetooth_if_disconnected(), Gtk.main_quit()))
     Gtk.main()
 
 
@@ -1296,7 +1329,17 @@ Terminal=false
 EOF
 ok "Mouse Logi BT reconnect instalado"
 
-# ── 28. POWER-SAVER POR DEFECTO ─────────────────────────────────────────────
+# ── 28. BLUETOOTH APAGADO POR DEFECTO ───────────────────────────────────────
+inf "Deshabilitando bluetooth en el arranque (el mouse lo activa cuando hace falta)..."
+sudo systemctl disable bluetooth 2>/dev/null || true
+sudo systemctl stop bluetooth 2>/dev/null || true
+# Sudoers para start/stop bluetooth sin contraseña (necesario para el script del mouse)
+echo "rcaceres ALL=(ALL) NOPASSWD: /usr/bin/systemctl start bluetooth, /usr/bin/systemctl stop bluetooth" | \
+  sudo tee /etc/sudoers.d/kalita-bluetooth > /dev/null
+sudo chmod 440 /etc/sudoers.d/kalita-bluetooth
+ok "Bluetooth deshabilitado por defecto + sudoers configurado"
+
+# ── 29. POWER-SAVER POR DEFECTO ─────────────────────────────────────────────
 inf "Configurando perfil de energía power-saver por defecto..."
 if command -v powerprofilesctl &>/dev/null; then
   sudo tee /etc/systemd/system/power-saver-default.service > /dev/null << 'EOF'
