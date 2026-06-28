@@ -83,6 +83,10 @@ window decoration {
 .xfce4-panel {
     color: #e6a23c;
 }
+.xfce4-panel image {
+    -gtk-icon-style: symbolic;
+    color: #e6a23c;
+}
 /* KALITA-PANEL-COLOR-FIN */
 EOF
 
@@ -107,6 +111,22 @@ if ! xfconf-query -c xfce4-panel -p /plugins/plugin-33 2>/dev/null | grep -q "sh
   SVALS=(); for v in "${VALS[@]}"; do SVALS+=("-s $v"); done
   xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids -n "${TYPES[@]}" "${SVALS[@]}" 2>/dev/null || true
   echo "[+] Botón showdesktop agregado (plugin-$NEW_ID)"
+fi
+
+# Indicador de batería: agregar si no existe ya en el panel
+if ! xfconf-query -c xfce4-panel -l 2>/dev/null | xargs -I{} sh -c 'xfconf-query -c xfce4-panel -p {} 2>/dev/null' | grep -q "power-manager-plugin"; then
+  MAX_ID=$(xfconf-query -c xfce4-panel -l 2>/dev/null | grep "^/plugins/plugin-[0-9]*$" | sed 's|/plugins/plugin-||' | sort -n | tail -1)
+  NEW_ID=$((MAX_ID + 1))
+  xfconf-query -c xfce4-panel -p /plugins/plugin-$NEW_ID -n -t string -s "power-manager-plugin"
+  # Insertar antes del último plugin (reloj)
+  IDS=($(xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids 2>/dev/null | grep -o '[0-9]*'))
+  LAST="${IDS[-1]}"
+  INIT=("${IDS[@]::${#IDS[@]}-1}")
+  VALS=("${INIT[@]}" "$NEW_ID" "$LAST")
+  TYPES=(); for v in "${VALS[@]}"; do TYPES+=("-t int"); done
+  SVALS=(); for v in "${VALS[@]}"; do SVALS+=("-s $v"); done
+  xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids -n "${TYPES[@]}" "${SVALS[@]}" 2>/dev/null || true
+  echo "[+] Indicador de batería agregado (plugin-$NEW_ID)"
 fi
 
 # Iconos Papirus-Dark: carpetas y wifi/bluetooth naranjos (requiere sudo)
